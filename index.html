@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle Line</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(180deg, #1d3a1d 0%, #234a2a 100%);
+    color: #f0f0f0;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow-x: auto;
+  }
+
+  .board {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 8px;
+    gap: 8px;
+    min-width: 720px;
+  }
+
+  .scoreboard {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    align-items: center;
+    font-size: 13px;
+    padding: 6px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 6px;
+  }
+  .scoreboard .pill { padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,0.08); }
+  .scoreboard .pill.p0 { color: #7bd; }
+  .scoreboard .pill.p1 { color: #f88; }
+  .scoreboard .deck { color: #ccc; font-variant-numeric: tabular-nums; }
+
+  .player-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    transition: box-shadow 0.2s, background 0.2s;
+  }
+  .player-area.active {
+    background: rgba(255, 215, 0, 0.10);
+    box-shadow: 0 0 18px rgba(255,215,0,0.25);
+  }
+  .player-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    color: #bbb;
+  }
+  .player-area.active .player-label { color: gold; font-weight: bold; }
+
+  .hand {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-height: 92px;
+    padding: 4px;
+  }
+
+  .card {
+    width: 56px;
+    height: 84px;
+    border-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px 6px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 2px solid rgba(0,0,0,0.35);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    font-size: 16px;
+    line-height: 1;
+    position: relative;
+  }
+  .card .top-num { align-self: flex-start; }
+  .card .bot-num { align-self: flex-end; transform: rotate(180deg); }
+  .card.selectable:hover { transform: translateY(-4px); }
+  .card.selected {
+    transform: translateY(-14px);
+    box-shadow: 0 6px 14px rgba(255,215,0,0.55);
+    border-color: gold;
+  }
+  .card.back {
+    background: repeating-linear-gradient(45deg, #2a3a4a, #2a3a4a 5px, #1f2d3a 5px, #1f2d3a 10px);
+    color: rgba(255,255,255,0.15);
+    cursor: default;
+  }
+  .card.back .top-num, .card.back .bot-num { content: ''; }
+  .card.color-red    { background: linear-gradient(160deg, #e44, #b22); color: #fff; }
+  .card.color-orange { background: linear-gradient(160deg, #f95, #d73); color: #fff; }
+  .card.color-yellow { background: linear-gradient(160deg, #fd4, #d92); color: #432; }
+  .card.color-green  { background: linear-gradient(160deg, #5b4, #283); color: #fff; }
+  .card.color-blue   { background: linear-gradient(160deg, #4ae, #258); color: #fff; }
+  .card.color-purple { background: linear-gradient(160deg, #a5d, #639); color: #fff; }
+  .card.dim { opacity: 0.55; }
+
+  .flags-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: stretch;
+    padding: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .flag {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 64px;
+    padding: 6px 4px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 6px;
+  }
+
+  .flag-side {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 56px;
+    min-height: 200px;
+    align-items: center;
+    border-radius: 4px;
+  }
+  .flag-side.top { justify-content: flex-end; }
+  .flag-side.bottom { justify-content: flex-start; }
+  .flag-side .card { width: 52px; height: 64px; font-size: 13px; }
+  .flag-side.droppable {
+    outline: 2px dashed gold;
+    background: rgba(255,215,0,0.07);
+    cursor: pointer;
+  }
+  .flag-side.droppable:hover { background: rgba(255,215,0,0.14); }
+  .slot {
+    width: 52px;
+    height: 64px;
+    border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: 6px;
+  }
+
+  .flag-marker {
+    width: 48px;
+    padding: 4px 0;
+    background: #555;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    text-align: center;
+    color: #fff;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .flag-marker.claimed-0 { background: linear-gradient(180deg, #4ae, #258); }
+  .flag-marker.claimed-1 { background: linear-gradient(180deg, #e44, #b22); }
+
+  .formation-label {
+    font-size: 10px;
+    color: #ddd;
+    background: rgba(0,0,0,0.4);
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-align: center;
+    min-width: 52px;
+    letter-spacing: 0.5px;
+  }
+
+  .claim-btn {
+    background: gold;
+    color: #222;
+    border: none;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: 0 0 8px rgba(255,215,0,0.4);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 8px rgba(255,215,0,0.4); }
+    50%     { box-shadow: 0 0 16px rgba(255,215,0,0.8); }
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 6px;
+  }
+  button.primary, button.secondary {
+    border: none;
+    padding: 9px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.15s, transform 0.05s;
+  }
+  button.primary { background: #4a7d4a; color: white; }
+  button.primary:hover:not(:disabled) { background: #5a9a5a; }
+  button.primary:active { transform: translateY(1px); }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary { background: #555; color: #ddd; }
+  button.secondary:hover { background: #666; }
+
+  .message {
+    text-align: center;
+    padding: 4px;
+    font-size: 13px;
+    color: #ffd;
+    min-height: 20px;
+  }
+
+  .overlay-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 16, 8, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 100;
+    cursor: pointer;
+    padding: 20px;
+  }
+  .overlay-bg h1 {
+    font-size: 36px;
+    color: gold;
+    text-align: center;
+  }
+  .overlay-bg h2 { font-size: 24px; color: #fff; text-align: center; }
+  .overlay-bg p { font-size: 16px; color: #ccc; text-align: center; max-width: 600px; }
+  .overlay-bg .tap-hint {
+    font-size: 14px;
+    color: #888;
+    margin-top: 12px;
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+  .help-toggle {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-weight: bold;
+    z-index: 50;
+  }
+
+  .help-panel {
+    position: fixed;
+    bottom: 50px;
+    right: 10px;
+    background: rgba(0,0,0,0.92);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    max-width: 360px;
+    font-size: 12px;
+    line-height: 1.5;
+    z-index: 50;
+  }
+  .help-panel h3 { font-size: 14px; margin-bottom: 6px; color: gold; }
+  .help-panel ul { margin: 4px 0 8px 18px; }
+  .help-panel li { margin: 3px 0; }
+  .help-panel .formation-row { display: flex; justify-content: space-between; gap: 8px; }
+  .help-panel .formation-row span:first-child { color: gold; font-weight: 600; }
+
+  .hand-count {
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 4px;
+  }
+
+  /* Feedback panel */
+  .feedback-toggle {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(80, 30, 30, 0.7);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 6px 12px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .feedback-toggle .badge {
+    background: gold;
+    color: #222;
+    padding: 1px 7px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .feedback-toggle .badge[data-count="0"] { display: none; }
+
+  .feedback-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 380px;
+    max-width: 92vw;
+    background: rgba(15, 25, 15, 0.97);
+    border-right: 1px solid rgba(255,255,255,0.15);
+    padding: 40px 16px 16px;
+    z-index: 200;
+    overflow-y: auto;
+    font-size: 13px;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+    transform: translateX(-105%);
+    transition: transform 0.25s ease;
+  }
+  .feedback-panel.open { transform: translateX(0); }
+  .feedback-panel h2 { font-size: 16px; color: gold; }
+  .feedback-panel .close-x {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: transparent;
+    color: #aaa;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .feedback-panel .field-label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #999;
+    margin: 14px 0 6px;
+  }
+  .feedback-categories { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cat-chip {
+    background: rgba(255,255,255,0.06);
+    color: #ddd;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 4px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .cat-chip.active { background: gold; color: #222; border-color: gold; }
+
+  .feedback-panel textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    min-height: 90px;
+    resize: vertical;
+  }
+  .feedback-panel .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #ccc;
+  }
+  .feedback-actions { display: flex; gap: 6px; margin-top: 12px; }
+  .feedback-panel .btn {
+    background: #468;
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .feedback-panel .btn:hover:not(:disabled) { background: #5a9; }
+  .feedback-panel .btn.gold { background: gold; color: #222; }
+  .feedback-panel .btn.danger { background: #844; }
+
+  .feedback-entries {
+    margin-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 12px;
+  }
+  .feedback-entry {
+    margin: 8px 0;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+    border-left: 3px solid #555;
+  }
+  .feedback-entry.bug { border-left-color: #f55; }
+  .feedback-entry.design { border-left-color: #5af; }
+  .feedback-entry.ux { border-left-color: #fa5; }
+  .feedback-entry.interaction { border-left-color: #5d5; }
+  .feedback-entry.other { border-left-color: #999; }
+  .feedback-entry-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #aaa;
+    margin-bottom: 4px;
+  }
+  .feedback-entry-cat { font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+  .feedback-entry-body { color: #ddd; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  .feedback-entry-state { margin-top: 4px; font-size: 10px; color: #888; }
+  .feedback-entry-delete {
+    background: transparent;
+    color: #f88;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0;
+  }
+  .feedback-footer-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .fb-status {
+    font-size: 11px;
+    color: #8a8;
+    margin-top: 6px;
+    min-height: 14px;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay"></div>
+<button class="help-toggle" onclick="toggleHelp()">?</button>
+<button class="feedback-toggle" onclick="openFeedback()">
+  Feedback <span class="badge" id="feedback-count" data-count="0">0</span>
+</button>
+<div class="feedback-panel" id="feedback-panel" role="dialog" aria-label="Playtest feedback">
+  <button class="close-x" onclick="closeFeedback()" aria-label="Close">×</button>
+  <h2>Playtest feedback</h2>
+  <p style="color:#999; font-size:12px; margin-top:4px">
+    Log notes as you play. Export to <code>feedback.md</code> when you're done and drop it in the project folder for Claude.
+  </p>
+
+  <label class="field-label">Category</label>
+  <div class="feedback-categories" id="cat-chips"></div>
+
+  <label class="field-label" for="fb-text">Notes</label>
+  <textarea id="fb-text" placeholder="What did you notice? Be specific — what you expected vs what happened."></textarea>
+
+  <div class="checkbox-row">
+    <input type="checkbox" id="fb-attach-state">
+    <label for="fb-attach-state" style="margin:0; text-transform:none; letter-spacing:0; color:#ccc; font-size:12px">
+      Attach current game state snapshot
+    </label>
+  </div>
+
+  <div class="feedback-actions">
+    <button class="btn gold" onclick="addFeedback()">Add entry</button>
+  </div>
+  <div class="fb-status" id="fb-status"></div>
+
+  <div class="feedback-entries" id="fb-entries"></div>
+
+  <div class="feedback-footer-actions">
+    <button class="btn" onclick="exportFeedback()">Export feedback.md</button>
+    <button class="btn danger" onclick="clearFeedback()">Clear all</button>
+  </div>
+</div>
+<div id="help" class="help-panel" style="display:none">
+  <h3>Battle Line</h3>
+  <p><b>Goal:</b> Claim 5 flags total, or 3 adjacent flags.</p>
+  <p><b>Turn:</b> Play one card to your side of any unclaimed flag (max 3 per side), then draw.</p>
+  <p><b>Formations</b> (high → low):</p>
+  <div class="formation-row"><span>Wedge</span><span>3 consecutive, same colour</span></div>
+  <div class="formation-row"><span>Phalanx</span><span>3 of the same value</span></div>
+  <div class="formation-row"><span>Battalion</span><span>3 of the same colour</span></div>
+  <div class="formation-row"><span>Skirmish</span><span>3 consecutive, any colour</span></div>
+  <div class="formation-row"><span>Host</span><span>any 3 (sum decides)</span></div>
+  <p style="margin-top:8px"><b>Claim:</b> A "Claim" button appears on flags where no formation the opponent could build from <i>any unplayed card</i> (deck + both hands) can beat yours. Your own hand isn't used to narrow this pool — you can't disclose private cards to prove a claim.</p>
+</div>
+
+<script>
+'use strict';
+
+const COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+let state;
+let helpVisible = false;
+
+function toggleHelp() {
+  helpVisible = !helpVisible;
+  document.getElementById('help').style.display = helpVisible ? 'block' : 'none';
+}
+
+function makeDeck() {
+  const d = [];
+  for (const c of COLORS) for (const v of VALUES) d.push({ color: c, value: v });
+  return d;
+}
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function newGame() {
+  const deck = shuffle(makeDeck());
+  const hands = [[], []];
+  for (let i = 0; i < 7; i++) {
+    hands[0].push(deck.pop());
+    hands[1].push(deck.pop());
+  }
+  const flags = Array.from({ length: 9 }, () => ({
+    sides: [[], []],
+    completedAt: [null, null],
+    claimedBy: null,
+  }));
+  return {
+    deck,
+    hands,
+    flags,
+    currentPlayer: 0,
+    selectedCardIdx: null,
+    hasPlayed: false,
+    awaitingPass: true,
+    turnCount: 0,
+    winner: null,
+  };
+}
+
+function cardKey(c) { return c.color + ':' + c.value; }
+
+function evalFormation(cards) {
+  if (cards.length < 3) return null;
+  const vals = cards.map(c => c.value).sort((a, b) => a - b);
+  const cols = cards.map(c => c.color);
+  const sum = vals[0] + vals[1] + vals[2];
+  const sameColor = cols[0] === cols[1] && cols[1] === cols[2];
+  const consecutive = (vals[0] !== vals[1]) && (vals[1] !== vals[2]) &&
+                      (vals[1] === vals[0] + 1) && (vals[2] === vals[1] + 1);
+  const sameValue = vals[0] === vals[1] && vals[1] === vals[2];
+
+  let rank, name;
+  if (sameColor && consecutive) { rank = 6; name = 'Wedge'; }
+  else if (sameValue)           { rank = 5; name = 'Phalanx'; }
+  else if (sameColor)           { rank = 4; name = 'Battalion'; }
+  else if (consecutive)         { rank = 3; name = 'Skirmish'; }
+  else                          { rank = 2; name = 'Host'; }
+
+  return { rank, sum, vals, name };
+}
+
+function cmpFormation(a, b) {
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  return a.sum - b.sum;
+}
+
+// Pool of cards available to the opponent for claim-evaluation purposes.
+// Per the strict rule, this is every card not yet played on a flag — including
+// cards in the claiming player's own hand. Using your own hand info to narrow
+// the pool would leak private information into the claim decision.
+function getUnplayedCards() {
+  const onFlags = new Set();
+  for (const f of state.flags) {
+    for (const side of f.sides) for (const c of side) onFlags.add(cardKey(c));
+  }
+  return makeDeck().filter(c => !onFlags.has(cardKey(c)));
+}
+
+// Best possible 3-card formation opponent could form, using all `existing`
+// cards plus (3 - existing.length) more drawn from `pool`.
+// Returns null if no formation can be formed (shouldn't happen if pool is non-empty enough).
+function bestPossibleFormation(existing, pool) {
+  const needed = 3 - existing.length;
+  if (needed === 0) return evalFormation(existing);
+  if (needed < 0) return null;
+
+  let best = null;
+  const consider = (f) => { if (f && (!best || cmpFormation(f, best) > 0)) best = f; };
+
+  const existingVals = existing.map(c => c.value);
+  const existingCols = new Set(existing.map(c => c.color));
+  const existingDistinctVals = new Set(existingVals);
+
+  // Wedge: 3 consecutive distinct values, all same colour.
+  if (existingCols.size <= 1 && existingDistinctVals.size === existingVals.length) {
+    const candCols = existingCols.size === 1 ? [...existingCols] : COLORS;
+    for (const col of candCols) {
+      for (let start = 1; start <= 8; start++) {
+        const target = [start, start + 1, start + 2];
+        if (!existingVals.every(v => target.includes(v))) continue;
+        const have = new Set(existingVals);
+        const want = target.filter(v => !have.has(v));
+        const ok = want.every(v => pool.some(c => c.color === col && c.value === v));
+        if (ok) {
+          consider({ rank: 6, name: 'Wedge', sum: target[0] + target[1] + target[2], vals: target });
+        }
+      }
+    }
+  }
+
+  // Phalanx: 3 cards same value.
+  if (existingDistinctVals.size <= 1) {
+    const fixed = existingVals.length > 0 ? existingVals[0] : null;
+    const candVals = fixed !== null ? [fixed] : VALUES;
+    for (const v of candVals) {
+      const inPool = pool.filter(c => c.value === v).length;
+      if (inPool >= needed) {
+        consider({ rank: 5, name: 'Phalanx', sum: v * 3, vals: [v, v, v] });
+      }
+    }
+  }
+
+  // Battalion: 3 same colour (not necessarily consecutive). Pick highest values from pool.
+  if (existingCols.size <= 1) {
+    const candCols = existingCols.size === 1 ? [...existingCols] : COLORS;
+    for (const col of candCols) {
+      const inPool = pool.filter(c => c.color === col).sort((a, b) => b.value - a.value);
+      if (inPool.length >= needed) {
+        const chosen = inPool.slice(0, needed);
+        consider(evalFormation([...existing, ...chosen]));
+      }
+    }
+  }
+
+  // Skirmish: 3 consecutive distinct values, any colour.
+  if (existingDistinctVals.size === existingVals.length) {
+    for (let start = 1; start <= 8; start++) {
+      const target = [start, start + 1, start + 2];
+      if (!existingVals.every(v => target.includes(v))) continue;
+      const have = new Set(existingVals);
+      const want = target.filter(v => !have.has(v));
+      const chosen = [];
+      let ok = true;
+      for (const v of want) {
+        const card = pool.find(c => c.value === v);
+        if (!card) { ok = false; break; }
+        chosen.push(card);
+      }
+      if (ok) consider(evalFormation([...existing, ...chosen]));
+    }
+  }
+
+  // Host: top `needed` cards from pool by value.
+  const sortedPool = [...pool].sort((a, b) => b.value - a.value);
+  if (sortedPool.length >= needed) {
+    const chosen = sortedPool.slice(0, needed);
+    consider(evalFormation([...existing, ...chosen]));
+  }
+
+  return best;
+}
+
+function canClaim(flagIdx, playerIdx) {
+  const flag = state.flags[flagIdx];
+  if (flag.claimedBy !== null) return false;
+  const mySide = flag.sides[playerIdx];
+  if (mySide.length !== 3) return false;
+  const oppIdx = 1 - playerIdx;
+  const oppSide = flag.sides[oppIdx];
+  const my = evalFormation(mySide);
+
+  if (oppSide.length === 3) {
+    const opp = evalFormation(oppSide);
+    const c = cmpFormation(my, opp);
+    if (c > 0) return true;
+    if (c < 0) return false;
+    return flag.completedAt[playerIdx] < flag.completedAt[oppIdx];
+  }
+
+  const pool = getUnplayedCards();
+  const best = bestPossibleFormation(oppSide, pool);
+  if (best === null) return true;
+  return cmpFormation(best, my) <= 0;
+}
+
+function checkWin() {
+  for (let p = 0; p < 2; p++) {
+    const claimed = state.flags.map(f => f.claimedBy === p);
+    const count = claimed.filter(Boolean).length;
+    if (count >= 5) return p;
+    for (let i = 0; i <= 6; i++) {
+      if (claimed[i] && claimed[i + 1] && claimed[i + 2]) return p;
+    }
+  }
+  return null;
+}
+
+function selectCard(idx) {
+  if (state.hasPlayed || state.awaitingPass) return;
+  state.selectedCardIdx = state.selectedCardIdx === idx ? null : idx;
+  render();
+}
+
+function playCard(flagIdx) {
+  if (state.hasPlayed || state.awaitingPass) return;
+  if (state.selectedCardIdx === null) return;
+  const flag = state.flags[flagIdx];
+  if (flag.claimedBy !== null) return;
+  if (flag.sides[state.currentPlayer].length >= 3) return;
+
+  const card = state.hands[state.currentPlayer].splice(state.selectedCardIdx, 1)[0];
+  flag.sides[state.currentPlayer].push(card);
+  if (flag.sides[state.currentPlayer].length === 3) {
+    flag.completedAt[state.currentPlayer] = state.turnCount;
+  }
+  state.turnCount++;
+  state.selectedCardIdx = null;
+  state.hasPlayed = true;
+  render();
+}
+
+function claimFlag(flagIdx) {
+  if (!canClaim(flagIdx, state.currentPlayer)) return;
+  state.flags[flagIdx].claimedBy = state.currentPlayer;
+  const w = checkWin();
+  if (w !== null) state.winner = w;
+  render();
+}
+
+function canEndTurn() {
+  if (state.winner !== null) return false;
+  if (state.hasPlayed) return true;
+  if (state.hands[state.currentPlayer].length === 0) return true;
+  const anyLegal = state.flags.some(f =>
+    f.claimedBy === null && f.sides[state.currentPlayer].length < 3);
+  if (!anyLegal) return true;
+  return false;
+}
+
+function endTurn() {
+  if (!canEndTurn()) return;
+  if (state.deck.length > 0) {
+    state.hands[state.currentPlayer].push(state.deck.pop());
+  }
+  state.currentPlayer = 1 - state.currentPlayer;
+  state.hasPlayed = false;
+  state.selectedCardIdx = null;
+  state.awaitingPass = true;
+  render();
+}
+
+function dismissPass() {
+  state.awaitingPass = false;
+  render();
+}
+
+function restartGame() {
+  state = newGame();
+  render();
+}
+
+function renderCard(card, idx, faceUp, ownerIdx) {
+  if (!faceUp) {
+    return '<div class="card back"><span class="top-num"></span><span class="bot-num"></span></div>';
+  }
+  const isMine = state.currentPlayer === ownerIdx;
+  const selected = isMine && state.selectedCardIdx === idx;
+  const canSelect = isMine && !state.hasPlayed && !state.awaitingPass;
+  const handler = canSelect ? `onclick="selectCard(${idx})"` : '';
+  const cls = ['card', 'color-' + card.color];
+  if (selected) cls.push('selected');
+  if (canSelect) cls.push('selectable');
+  return `<div class="${cls.join(' ')}" ${handler}>
+    <span class="top-num">${card.value}</span>
+    <span class="bot-num">${card.value}</span>
+  </div>`;
+}
+
+function renderFlagSideCards(side, isTop) {
+  const slots = [];
+  for (let i = 0; i < 3; i++) {
+    if (side[i]) {
+      slots.push(`<div class="card color-${side[i].color}">
+        <span class="top-num">${side[i].value}</span>
+        <span class="bot-num">${side[i].value}</span>
+      </div>`);
+    } else {
+      slots.push('<div class="slot"></div>');
+    }
+  }
+  // For the top side, render so cards stack toward the flag (last played sits closest to flag).
+  if (isTop) return slots.slice().reverse().join('');
+  return slots.join('');
+}
+
+function renderFlag(flag, idx) {
+  const cp = state.currentPlayer;
+  const canPlayHere =
+    !state.awaitingPass &&
+    !state.hasPlayed &&
+    state.selectedCardIdx !== null &&
+    flag.claimedBy === null &&
+    flag.sides[cp].length < 3;
+  const canClaimHere = !state.awaitingPass && canClaim(idx, cp);
+
+  const p2Done = flag.sides[1].length === 3 ? evalFormation(flag.sides[1]) : null;
+  const p1Done = flag.sides[0].length === 3 ? evalFormation(flag.sides[0]) : null;
+
+  const claimedTxt = flag.claimedBy === null
+    ? (idx + 1).toString()
+    : (flag.claimedBy === 0 ? 'P1' : 'P2');
+  const markerCls = flag.claimedBy === null ? '' : 'claimed-' + flag.claimedBy;
+
+  // Player 2 occupies the top side; player 1 occupies the bottom side.
+  const topDroppable = cp === 1 && canPlayHere;
+  const botDroppable = cp === 0 && canPlayHere;
+
+  const topClick = topDroppable ? `onclick="playCard(${idx})"` : '';
+  const botClick = botDroppable ? `onclick="playCard(${idx})"` : '';
+
+  return `<div class="flag">
+    <div class="flag-side top ${topDroppable ? 'droppable' : ''}" ${topClick}>
+      ${renderFlagSideCards(flag.sides[1], true)}
+    </div>
+    ${p2Done ? `<div class="formation-label">${p2Done.name} · ${p2Done.sum}</div>` : ''}
+    ${canClaimHere && cp === 1 ? `<button class="claim-btn" onclick="claimFlag(${idx})">Claim ↑</button>` : ''}
+    <div class="flag-marker ${markerCls}">${claimedTxt}</div>
+    ${canClaimHere && cp === 0 ? `<button class="claim-btn" onclick="claimFlag(${idx})">Claim ↓</button>` : ''}
+    ${p1Done ? `<div class="formation-label">${p1Done.name} · ${p1Done.sum}</div>` : ''}
+    <div class="flag-side bottom ${botDroppable ? 'droppable' : ''}" ${botClick}>
+      ${renderFlagSideCards(flag.sides[0], false)}
+    </div>
+  </div>`;
+}
+
+function getMessage() {
+  if (state.winner !== null) return '';
+  if (state.awaitingPass) return '';
+  const cp = state.currentPlayer;
+  if (!state.hasPlayed) {
+    if (state.hands[cp].length === 0) return 'No cards to play — end your turn.';
+    if (state.selectedCardIdx === null) return 'Select a card from your hand.';
+    return 'Tap a flag column to play your card.';
+  }
+  return 'Claim flags if you can, then end your turn.';
+}
+
+function renderBoard() {
+  const p0Score = state.flags.filter(f => f.claimedBy === 0).length;
+  const p1Score = state.flags.filter(f => f.claimedBy === 1).length;
+  const cp = state.currentPlayer;
+  const showP0 = cp === 0 && !state.awaitingPass;
+  const showP1 = cp === 1 && !state.awaitingPass;
+
+  const p1Hand = state.hands[1].map((c, i) => renderCard(c, i, showP1, 1)).join('');
+  const p0Hand = state.hands[0].map((c, i) => renderCard(c, i, showP0, 0)).join('');
+
+  return `
+    <div class="board">
+      <div class="scoreboard">
+        <span class="pill p1">Player 2: ${p1Score} flag${p1Score === 1 ? '' : 's'}</span>
+        <span class="pill deck">Deck: ${state.deck.length}</span>
+        <span class="pill p0">Player 1: ${p0Score} flag${p0Score === 1 ? '' : 's'}</span>
+      </div>
+
+      <div class="player-area ${cp === 1 ? 'active' : ''}">
+        <div class="player-label">Player 2 ${cp === 1 ? '· your turn' : ''}</div>
+        <div class="hand">${p1Hand}</div>
+        <div class="hand-count">${state.hands[1].length} card${state.hands[1].length === 1 ? '' : 's'}</div>
+      </div>
+
+      <div class="flags-row">
+        ${state.flags.map((f, i) => renderFlag(f, i)).join('')}
+      </div>
+
+      <div class="message">${getMessage()}</div>
+
+      <div class="player-area ${cp === 0 ? 'active' : ''}">
+        <div class="hand-count">${state.hands[0].length} card${state.hands[0].length === 1 ? '' : 's'}</div>
+        <div class="hand">${p0Hand}</div>
+        <div class="player-label">Player 1 ${cp === 0 ? '· your turn' : ''}</div>
+      </div>
+
+      <div class="controls">
+        <button class="primary" onclick="endTurn()" ${canEndTurn() ? '' : 'disabled'}>
+          ${state.hasPlayed ? 'Draw &amp; end turn' : (state.hands[cp].length === 0 ? 'End turn' : 'Play a card first')}
+        </button>
+        <button class="secondary" onclick="if (confirm('Start a new game?')) restartGame()">New game</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderOverlay() {
+  const o = document.getElementById('overlay');
+  if (state.winner !== null) {
+    o.innerHTML = `
+      <div class="overlay-bg" onclick="event.stopPropagation()">
+        <h1>Player ${state.winner + 1} wins!</h1>
+        <p>${state.flags.filter(f => f.claimedBy === state.winner).length} flag${state.flags.filter(f => f.claimedBy === state.winner).length === 1 ? '' : 's'} claimed.</p>
+        <button class="primary" onclick="restartGame()">Play again</button>
+      </div>`;
+    return;
+  }
+  if (state.awaitingPass) {
+    o.innerHTML = `
+      <div class="overlay-bg" onclick="dismissPass()">
+        <h1>Player ${state.currentPlayer + 1}'s turn</h1>
+        <h2>Pass the device</h2>
+        <p>Hand cards are hidden from the other player. When ready, tap to reveal your hand.</p>
+        <p class="tap-hint">Tap anywhere to continue</p>
+      </div>`;
+    return;
+  }
+  o.innerHTML = '';
+}
+
+function render() {
+  document.getElementById('app').innerHTML = renderBoard();
+  renderOverlay();
+}
+
+state = newGame();
+render();
+
+// ---------- Feedback panel ----------
+
+const FB_KEY = 'battle-line-feedback';
+const FB_CATEGORIES = [
+  { id: 'bug',         label: 'Bug',         autoState: true  },
+  { id: 'design',      label: 'Design',      autoState: false },
+  { id: 'ux',          label: 'UX',          autoState: false },
+  { id: 'interaction', label: 'Interaction', autoState: false },
+  { id: 'other',       label: 'Other',       autoState: false },
+];
+let fbCategory = 'bug';
+let fbFileHandle = null;
+
+function fbLoad() {
+  try {
+    const raw = localStorage.getItem(FB_KEY);
+    return raw ? JSON.parse(raw) : { entries: [] };
+  } catch { return { entries: [] }; }
+}
+function fbSave(data) { localStorage.setItem(FB_KEY, JSON.stringify(data)); }
+
+function openFeedback() {
+  document.getElementById('feedback-panel').classList.add('open');
+  document.getElementById('fb-text').focus();
+  renderFeedback();
+}
+function closeFeedback() {
+  document.getElementById('feedback-panel').classList.remove('open');
+  setFbStatus('');
+}
+
+function selectFbCategory(id) {
+  fbCategory = id;
+  const cat = FB_CATEGORIES.find(c => c.id === id);
+  document.getElementById('fb-attach-state').checked = cat ? cat.autoState : false;
+  renderCategoryChips();
+}
+
+function renderCategoryChips() {
+  document.getElementById('cat-chips').innerHTML = FB_CATEGORIES.map(c =>
+    `<span class="cat-chip ${c.id === fbCategory ? 'active' : ''}" onclick="selectFbCategory('${c.id}')">${c.label}</span>`
+  ).join('');
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, ch => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]
+  ));
+}
+
+function addFeedback() {
+  const ta = document.getElementById('fb-text');
+  const text = ta.value.trim();
+  if (!text) { setFbStatus('Add some notes first.'); return; }
+  const attach = document.getElementById('fb-attach-state').checked;
+  const data = fbLoad();
+  data.entries.push({
+    id: Date.now(),
+    timestamp: new Date().toISOString(),
+    category: fbCategory,
+    content: text,
+    gameState: attach ? JSON.parse(JSON.stringify(state)) : null,
+  });
+  fbSave(data);
+  ta.value = '';
+  setFbStatus(`Saved (${data.entries.length} total).`);
+  renderFeedback();
+  updateFeedbackBadge();
+}
+
+function deleteFeedback(id) {
+  const data = fbLoad();
+  data.entries = data.entries.filter(e => e.id !== id);
+  fbSave(data);
+  renderFeedback();
+  updateFeedbackBadge();
+}
+
+function clearFeedback() {
+  const data = fbLoad();
+  if (data.entries.length === 0) return;
+  if (!confirm(`Delete all ${data.entries.length} feedback entries? This can't be undone.`)) return;
+  localStorage.removeItem(FB_KEY);
+  renderFeedback();
+  updateFeedbackBadge();
+  setFbStatus('Cleared.');
+}
+
+function renderFeedback() {
+  const data = fbLoad();
+  const root = document.getElementById('fb-entries');
+  if (data.entries.length === 0) {
+    root.innerHTML = '<p style="color:#888; font-size:12px; margin-top:8px">No entries yet.</p>';
+    return;
+  }
+  root.innerHTML =
+    `<p style="color:#aaa; font-size:11px; margin-bottom:8px">${data.entries.length} entr${data.entries.length===1?'y':'ies'} logged · newest first</p>` +
+    data.entries.slice().reverse().map(e => {
+      const d = new Date(e.timestamp);
+      const time = d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      return `<div class="feedback-entry ${e.category}">
+        <div class="feedback-entry-head">
+          <span><span class="feedback-entry-cat">${e.category}</span> · ${time}</span>
+          <button class="feedback-entry-delete" onclick="deleteFeedback(${e.id})">delete</button>
+        </div>
+        <div class="feedback-entry-body">${escapeHtml(e.content)}</div>
+        ${e.gameState ? '<div class="feedback-entry-state">+ game state attached</div>' : ''}
+      </div>`;
+    }).join('');
+}
+
+function updateFeedbackBadge() {
+  const data = fbLoad();
+  const badge = document.getElementById('feedback-count');
+  badge.textContent = data.entries.length;
+  badge.setAttribute('data-count', data.entries.length);
+}
+
+function generateFeedbackMarkdown(data) {
+  const lines = ['# Battle Line — Playtest feedback', '', `Exported: ${new Date().toISOString()}  `, `Total entries: ${data.entries.length}`, ''];
+  data.entries.forEach((e, i) => {
+    const d = new Date(e.timestamp);
+    lines.push(`## ${i + 1}. ${e.category.toUpperCase()} — ${d.toLocaleString()}`);
+    lines.push('');
+    lines.push(e.content);
+    lines.push('');
+    if (e.gameState) {
+      lines.push('<details>');
+      lines.push('<summary>Game state snapshot</summary>');
+      lines.push('');
+      lines.push('```json');
+      lines.push(JSON.stringify(e.gameState, null, 2));
+      lines.push('```');
+      lines.push('');
+      lines.push('</details>');
+      lines.push('');
+    }
+  });
+  return lines.join('\n');
+}
+
+async function exportFeedback() {
+  const data = fbLoad();
+  if (data.entries.length === 0) { setFbStatus('Nothing to export.'); return; }
+  const content = generateFeedbackMarkdown(data);
+
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = fbFileHandle || await window.showSaveFilePicker({
+        suggestedName: 'feedback.md',
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      });
+      fbFileHandle = handle;
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      setFbStatus(`Saved to ${handle.name}.`);
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') { setFbStatus('Save cancelled.'); return; }
+      console.warn('FSA save failed, falling back to download:', e);
+    }
+  }
+
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'feedback.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setFbStatus('Downloaded feedback.md — move it to the project folder.');
+}
+
+function setFbStatus(msg) {
+  document.getElementById('fb-status').textContent = msg;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('feedback-panel').classList.contains('open')) {
+      closeFeedback();
+    }
+  }
+  // Cmd/Ctrl + Shift + F to open feedback
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    openFeedback();
+  }
+});
+
+renderCategoryChips();
+updateFeedbackBadge();
+</script>
+</body>
+</html>
